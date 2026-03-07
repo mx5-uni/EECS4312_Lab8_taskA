@@ -1,5 +1,5 @@
-## Student Name:
-## Student ID:
+## Student Name: Anna Maximova
+## Student ID: 219815257
 
 """
 Task A: Appointment Timeslot Recommender (Stub)
@@ -86,6 +86,38 @@ class InfeasibleSchedule(Exception):
     """Raised when no valid slots can be produced (if required by handout)."""
     pass
 
+# ---------------- Helper Functions ----------------
+
+def _combine(day: date, t: time) -> datetime:
+    return datetime.combine(day, t)
+
+
+def _merge_intervals(intervals):
+    """Merge overlapping or adjacent intervals."""
+    if not intervals:
+        return []
+
+    intervals.sort(key=lambda x: x[0])
+    merged = [intervals[0]]
+
+    for start, end in intervals[1:]:
+        last_start, last_end = merged[-1]
+
+        if start <= last_end:  # overlap OR adjacency
+            merged[-1] = (last_start, max(last_end, end))
+        else:
+            merged.append((start, end))
+
+    return merged
+
+
+def _intersect(a_start, a_end, b_start, b_end):
+    start = max(a_start, b_start)
+    end = min(a_end, b_end)
+    if start < end:
+        return (start, end)
+    return None
+
 
 # ---------------- Core Function ----------------
 
@@ -121,8 +153,87 @@ def suggest_slots(
         - See lab handout for required slot granularity (e.g., 5-min/15-min steps), if any.
     """
 
-    ##################################################################
-    # TODO: Implement as per lab handout requirements and constraints.
-    ##################################################################
-    
-    raise NotImplementedError("suggest_slots has not been implemented yet")
+    if duration <= timedelta(0):
+        raise ValueError("duration must be positive")
+
+    if n <= 0:
+        return []
+
+    STEP = timedelta(minutes=5)
+
+    # ---- Working window ----
+    working_start = _combine(day, working_hours.start)
+    working_end = _combine(day, working_hours.end)
+
+    # ---- Candidate window ----
+    if candidate_window:
+        cand_start = _combine(day, candidate_window.start)
+        cand_end = _combine(day, candidate_window.end)
+    else:
+        cand_start = working_start
+        cand_end = working_end
+
+    # ensure candidate inside working
+    cand_start = max(cand_start, working_start)
+    cand_end = min(cand_end, working_end)
+
+    # ---- Convert busy intervals ----
+    busy_dt = []
+    for b in busy_intervals:
+        start = _combine(day, b.start)
+        end = _combine(day, b.end)
+
+        # apply buffer
+        start -= buffer
+        end += buffer
+
+        busy_dt.append((start, end))
+
+    # ---- Normalize busy intervals ----
+    busy_dt = _merge_intervals(busy_dt)
+
+    # ---- Clip busy to working window ----
+    clipped_busy = []
+    for s, e in busy_dt:
+        if e <= working_start or s >= working_end:
+            continue
+        clipped_busy.append((max(s, working_start), min(e, working_end)))
+
+    busy_dt = _merge_intervals(clipped_busy)
+
+    # ---- Compute free gaps ----
+    free_gaps = []
+
+    prev = working_start
+
+    for s, e in busy_dt:
+        if prev < s:
+            free_gaps.append((prev, s))
+        prev = max(prev, e)
+
+    if prev < working_end:
+        free_gaps.append((prev, working_end))
+
+    # ---- Apply candidate window restriction ----
+    candidate_gaps = []
+    for s, e in free_gaps:
+        inter = _intersect(s, e, cand_start, cand_end)
+        if inter:
+            candidate_gaps.append(inter)
+
+    # ---- Generate slots ----
+    slots = []
+
+    for gap_start, gap_end in candidate_gaps:
+
+        t = gap_start
+
+        while t + duration <= gap_end:
+            slots.append(Slot(start_time=t.time()))
+
+            if len(slots) >= n:
+                return sorted(slots, key=lambda s: s.start_time)
+
+            t += STEP
+
+    return sorted(slots, key=lambda s: s.start_time)

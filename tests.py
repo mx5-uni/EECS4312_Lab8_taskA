@@ -179,3 +179,147 @@ def test_a5_buffer_eliminates_small_gaps():
 #################################################################################
 # Add your own additional tests here to cover more cases and edge cases as needed.
 #################################################################################
+
+
+# ---------- Additional Tests (Traceability Coverage) ----------
+
+def test_slots_within_working_hours():
+    """
+    AC1 / C5 / C7
+    Ensure all suggested slots fall completely within the working hours window.
+    """
+    day = date(2026, 2, 24)
+
+    working = TimeWindow(time(9, 0), time(10, 0))
+    busy = []
+    duration = timedelta(minutes=20)
+
+    out = suggest_slots(day, working, busy, duration, n=5)
+
+    assert len(out) > 0
+
+    for s in out:
+        start_dt = combine(day, s.start_time)
+        end_dt = start_dt + duration
+
+        assert working.start <= s.start_time < working.end
+        assert end_dt.time() <= working.end
+
+
+def test_adjacent_busy_intervals_no_gap():
+    """
+    AC3 / C3
+    Edge Case EC4
+
+    Two busy intervals are adjacent (10:00–11:00 and 11:00–12:00).
+    No slot should be scheduled between them.
+    """
+    day = date(2026, 2, 24)
+
+    working = TimeWindow(time(9, 0), time(13, 0))
+
+    busy = [
+        BusyInterval(time(10, 0), time(11, 0)),
+        BusyInterval(time(11, 0), time(12, 0)),
+    ]
+
+    duration = timedelta(minutes=30)
+
+    out = suggest_slots(day, working, busy, duration, n=10)
+
+    for s in out:
+        start = combine(day, s.start_time)
+        end = start + duration
+
+        assert not overlaps(start, end, combine(day, time(10, 0)), combine(day, time(12, 0)))
+
+
+def test_buffer_time_enforced():
+    """
+    AC4 / C4
+    Edge Case EC5
+
+    Buffer time should remove slots that would otherwise fit.
+    """
+    day = date(2026, 2, 24)
+
+    working = TimeWindow(time(9, 0), time(11, 0))
+
+    busy = [
+        BusyInterval(time(9, 30), time(10, 0)),
+    ]
+
+    duration = timedelta(minutes=30)
+
+    # No buffer -> slot at 10:00 possible
+    no_buffer = suggest_slots(
+        day,
+        working,
+        busy,
+        duration,
+        n=5,
+        buffer=timedelta(0)
+    )
+
+    # With buffer -> slot should disappear
+    with_buffer = suggest_slots(
+        day,
+        working,
+        busy,
+        duration,
+        n=5,
+        buffer=timedelta(minutes=15)
+    )
+
+    assert len(with_buffer) <= len(no_buffer)
+
+
+def test_candidate_window_restriction():
+    """
+    AC7 / C9
+    Edge Case EC7
+
+    Candidate window contains no available slots due to busy intervals.
+    """
+    day = date(2026, 2, 24)
+
+    working = TimeWindow(time(9, 0), time(17, 0))
+    candidate = TimeWindow(time(10, 0), time(11, 0))
+
+    busy = [
+        BusyInterval(time(10, 0), time(11, 0))
+    ]
+
+    duration = timedelta(minutes=20)
+
+    out = suggest_slots(
+        day,
+        working,
+        busy,
+        duration,
+        n=5,
+        candidate_window=candidate
+    )
+
+    assert out == []
+
+
+def test_slot_at_working_hour_boundary():
+    """
+    AC1 / C5 / C7
+    Edge Case EC8
+
+    Slot should be allowed exactly at the start or end boundary
+    as long as it does not exceed working hours.
+    """
+    day = date(2026, 2, 24)
+
+    working = TimeWindow(time(9, 0), time(10, 0))
+    busy = []
+
+    duration = timedelta(minutes=60)
+
+    out = suggest_slots(day, working, busy, duration, n=1)
+
+    assert len(out) == 1
+    assert out[0].start_time == time(9, 0)
