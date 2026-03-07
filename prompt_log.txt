@@ -1,6 +1,562 @@
-## Student Name:
-## Student ID: 
+## Student Name: Anna Maximova
+## Student ID: 219815257
 
 Prompt #1: {}
 Response #1: {}
 --------------------------------------------------
+
+Prompt #1:
+In this lab, you will design and implement an Appointment Slot Recommender using an LLM assistant as your primary programming collaborator. You are asked to implement a Python module that recommends available meeting slots within a defined working  window. 
+
+The functional requirements:
+The system must... 
+
+... Accept working hours input.
+
+... Accept a list of busy intervals.
+
+... Accept required meeting duration.
+
+... Accept optional buffer time between meetings.
+
+... Accept an optional candidate window restriction.
+
+... Normalize busy intervals if they are unsorted.
+
+... Merge overlapping busy intervals.
+
+... Handle adjacent busy intervals correctly.
+
+... Respect buffer times when computing availability.
+
+... Ensure suggested slots fall within working hours.
+
+... Ensure slots do not overlap existing meetings.
+
+... Ensure slots meet minimum duration requirements.
+
+... Generate available time gaps between busy intervals.
+
+... Filter gaps based on duration requirements.
+
+... Filter gaps based on candidate window restrictions.
+
+... Return the next N available slots.
+
+... Return slots in chronological order.
+
+... Produce deterministic results given identical inputs.
+
+... Handle cases where no slots are available.
+
+... Correctly handle buffers that eliminate availability.
+
+... Handle very small gaps between meetings.
+
+The constraints:
+1.All times refer to the same day unless otherwise specified.
+2. Busy intervals may be unsorted or overlapping.
+3. Busy intervals may touch or be adjacent.
+4. Buffer time must be applied before and after busy intervals when evaluating availability.
+5. Working hours define the maximum scheduling boundary.
+6. Meeting duration must be positive.
+7. Returned slots must not extend beyond working hours.
+8. Busy intervals are assumed to represent confirmed meetings.
+9. Candidate window must lie within working hours.
+
+The acceptance criteria:
+
+AC1
+Given working hours with a defined start and end time
+
+When the program generates appointment slots
+
+Then all returned slots must fall completely within the working hours window.
+
+Linked Constraint ID(s): C5, C7
+
+
+
+AC2
+
+Given a list of busy intervals that are unsorted or overlapping
+
+When the system processes the intervals to determine availability
+
+Then the system must correctly handle them and produce valid available slots that do not overlap any busy interval.
+
+Linked Constraint ID(s): C2
+
+
+
+AC3
+
+Given two busy intervals that are directly adjacent (one ends at 10:00 and the next begins at 10:00)
+
+When the system evaluates available time between them
+
+Then no appointment slot may be returned within the adjacent boundary.
+
+Linked Constraint ID(s): C3
+
+
+
+AC4
+
+Given a buffer time is specified
+
+When the system evaluates gaps between meetings
+
+Then the buffer must be enforced both before and after busy intervals when determining valid appointment slots.
+
+Linked Constraint ID(s): C4
+
+
+
+AC5
+
+Given a meeting duration is provided
+
+When the system generates appointment slots
+
+Then every returned slot must be at least as long as the required meeting duration.
+
+Linked Constraint ID(s): C6
+
+
+
+AC6
+
+Given busy intervals represent confirmed meetings
+
+When the system recommends appointment slots
+
+Then no recommended slot may overlap with any busy interval.
+
+Linked Constraint ID(s): C8
+
+
+
+AC7
+
+Given a candidate time window is specified
+
+When the recommender generates appointment slots
+
+Then all returned slots must fall within the candidate window.
+
+Linked Constraint ID(s): C9
+
+
+
+AC8
+
+Given the system is evaluating availability for a single scheduling request
+
+When it processes working hours, busy intervals, and meeting duration
+
+Then all calculations must assume the times occur within the same day.
+
+Linked Constraint ID(s): C1
+
+
+
+
+
+
+
+Are there any ambiguities or missing clarifications that exist here?
+
+Response #1:
+Yes. The specification is generally clear, but there are **several ambiguities and edge-case behaviors that are not explicitly defined**. These should ideally be clarified before implementation to ensure deterministic and consistent results.
+
+Below are the main categories of ambiguity.
+
+---
+
+# 1. Time Representation (Not Specified)
+
+The spec never defines **how time is represented**.
+
+Possible interpretations:
+
+* `"HH:MM"` strings
+* `datetime.time`
+* `datetime.datetime`
+* integer minutes since midnight
+
+Why this matters:
+
+* Comparison logic
+* Sorting
+* Buffer calculations
+* Deterministic output formatting
+
+**Clarification needed**
+
+* What time format is the input?
+* What format should slots be returned in?
+
+Example clarification:
+
+> Times are represented as `datetime.datetime` objects or minutes since midnight.
+
+---
+
+# 2. Slot Generation Strategy
+
+The spec says:
+
+> Return the next N available slots
+
+But it does **not define how slots are generated inside a valid gap**.
+
+Example gap:
+
+```
+10:00 — 11:00
+Meeting duration = 30 minutes
+```
+
+Possible interpretations:
+
+Option A — **single slot per gap**
+
+```
+10:00–10:30
+```
+
+Option B — **multiple sequential slots**
+
+```
+10:00–10:30
+10:30–11:00
+```
+
+Option C — **sliding window**
+
+```
+10:00–10:30
+10:01–10:31
+10:02–10:32
+...
+```
+
+Most scheduling systems use **Option B**, but the spec does not say.
+
+**Clarification needed**
+
+* Are slots sequential blocks?
+* Should multiple slots be generated per gap?
+
+---
+
+# 3. Value of N (Number of Slots)
+
+The system must:
+
+> Return the next N available slots.
+
+But the spec does not define:
+
+* How `N` is passed
+* What the default value is
+* What happens if fewer than N slots exist
+
+**Clarification needed**
+
+* Is `N` an input parameter?
+* Should the system return all slots if fewer than `N` exist?
+
+---
+
+# 4. Candidate Window Behavior
+
+Constraint:
+
+> Candidate window must lie within working hours.
+
+But unclear behaviors exist.
+
+Example:
+
+Working hours
+
+```
+09:00 — 17:00
+```
+
+Candidate window
+
+```
+10:00 — 12:00
+```
+
+Questions:
+
+* Should busy intervals **outside** the candidate window be ignored?
+* Or should they still affect buffer calculations?
+
+Example:
+
+Busy interval
+
+```
+09:50 — 10:10
+```
+
+Buffer = 10 minutes
+
+Does the 09:50 meeting affect availability at 10:00?
+
+This is **not specified**.
+
+---
+
+# 5. Buffer Interaction With Working Hours
+
+Buffer must be applied:
+
+> before and after busy intervals.
+
+But unclear when buffers extend beyond working hours.
+
+Example:
+
+Working hours
+
+```
+09:00 — 17:00
+```
+
+Busy interval
+
+```
+09:00 — 09:30
+```
+
+Buffer = 15 minutes
+
+Buffered interval becomes
+
+```
+08:45 — 09:45
+```
+
+Question:
+
+* Should the system **clip buffers at working hours**?
+* Or should buffers eliminate early slots entirely?
+
+---
+
+# 6. Busy Interval Validation
+
+The spec says busy intervals may be:
+
+* unsorted
+* overlapping
+
+But it does **not specify validation rules**, such as:
+
+Edge cases:
+
+```
+end < start
+```
+
+Example:
+
+```
+13:00 — 12:30
+```
+
+Also unclear:
+
+* Are zero-length intervals allowed?
+
+Example:
+
+```
+10:00 — 10:00
+```
+
+---
+
+# 7. Adjacent Intervals With Buffers
+
+AC3 states:
+
+> Adjacent intervals produce no availability.
+
+But buffer may create adjacency automatically.
+
+Example:
+
+Busy intervals
+
+```
+09:00–10:00
+10:00–11:00
+```
+
+Buffer = 15
+
+Buffered intervals:
+
+```
+08:45–10:15
+09:45–11:15
+```
+
+These **overlap heavily**.
+
+The spec does not state whether buffers should be applied **before or after merging**.
+
+Possible implementations:
+
+Option A:
+
+```
+merge → apply buffer
+```
+
+Option B:
+
+```
+apply buffer → merge
+```
+
+These produce different results.
+
+---
+
+# 8. Definition of "Handle Very Small Gaps"
+
+Requirement:
+
+> Handle very small gaps between meetings.
+
+But no behavior is defined.
+
+Example:
+
+Gap = 4 minutes
+Meeting duration = 30
+
+Expected behavior is likely **ignore**, but this should be explicitly stated.
+
+---
+
+# 9. Output Structure
+
+The system must return slots, but the format is not defined.
+
+Possibilities:
+
+List of tuples
+
+```
+[(10:00, 10:30), (10:30, 11:00)]
+```
+
+Objects
+
+```
+[{start:..., end:...}]
+```
+
+Strings
+
+```
+["10:00-10:30"]
+```
+
+Clarification needed.
+
+---
+
+# 10. Time Inclusivity Rules
+
+The spec does not define whether time boundaries are **inclusive or exclusive**.
+
+Example:
+
+Busy interval
+
+```
+10:00–11:00
+```
+
+Can a meeting start at **11:00**?
+
+Most systems use:
+
+```
+[start, end)
+```
+
+But this should be stated explicitly.
+
+---
+
+# 11. Handling of Negative or Zero Duration
+
+Constraint:
+
+> Meeting duration must be positive.
+
+But behavior is not defined if invalid input is provided.
+
+Should the system:
+
+* raise exception
+* return empty result
+* silently ignore
+
+---
+
+# 12. Deterministic Ordering With Identical Slots
+
+Spec says:
+
+> Return slots in chronological order.
+
+But if multiple slots share the same start time due to different candidate windows or logic, behavior is not defined.
+
+---
+
+# 13. Day Boundary Behavior
+
+Constraint says:
+
+> All times occur within the same day.
+
+But it does not specify:
+
+* whether times can cross midnight
+* whether `23:59` is valid
+* timezone handling
+
+---
+
+# Summary of Key Ambiguities
+
+The **most important clarifications** to request are:
+
+1. **Time representation**
+2. **Slot generation policy inside gaps**
+3. **How N is defined**
+4. **Buffer application order**
+5. **Candidate window interaction with buffers**
+6. **Output data format**
+7. **Time boundary inclusivity**
+
+---
+
+✅ If you'd like, I can also show you the **reference architecture most instructors expect for this assignment** (normalization → buffering → merging → gap extraction → slot generation). It makes implementing all acceptance criteria much easier.
+
+
+Actions taken by me:
+These are some very good points brought up by ChatGPT here, but the comments about the edge cases are covered in the edge case section of Par 1 of this lab, since I wasn't asked to provide them to it I didn't.
+The rest of the comments are about more specific parts of the implementation which are detailed inside of the "solution.py" file provided with the lab. So I will choose to ignore them as suggestions and provide it with the solution.py template file for the next step of code generation.
