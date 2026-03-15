@@ -65,6 +65,8 @@ C7: The system must filter availability so that all suggested slots lie entirely
 Derived from persona attribute: Jane / Need / Users need availability only within working hours
 C8: The system must explicitly handle edge cases (e.g., zero availability, overlapping meetings, buffer-eliminated gaps) and return user-facing notifications.
 Derived from persona attribute: Mo / Pain Point / User expects explicit edge case handling
+C9: System should handle overlapping busy intervals where the buffer may push the next available slot beyond the working hours.
+Derived from persona attribute: ChatGPT suggested this during revision.
 
 ---
 
@@ -178,3 +180,7 @@ FR23 → C8, C4 → AC5
 ---
 
 ## Revision Notes:
+Revision Note 1
+Requirement updated: Added C9
+Reason: It was a good suggestion and covers something I did not think of.
+Action: Added ChatGPT's suggestion as a new C9.

@@ -129,7 +129,7 @@ def suggest_slots(
     n: int,
     buffer: timedelta = timedelta(0),
     candidate_window: Optional[TimeWindow] = None
-) -> List[Slot]:
+) -> Tuple[List[Slot], str]:  # Returning a tuple (slots, feedback)
     """
     Suggest up to the next n valid appointment slots (start times) for the given day.
 
@@ -143,21 +143,16 @@ def suggest_slots(
         candidate_window: optional extra restriction on suggestions (must lie within this window too).
 
     Returns:
-        A list of Slot objects, sorted by start_time ascending, deterministic under identical inputs.
-        If no suitable time slots are available, return an empty list.
-
-    Notes:
-        - Suggested slots must fall within working_hours (and candidate_window if provided).
-        - Suggested slots must not overlap busy_intervals, considering buffer time.
-        - You are free to choose internal representation; inputs use time-of-day.
-        - See lab handout for required slot granularity (e.g., 5-min/15-min steps), if any.
+        A tuple of:
+            - List of Slot objects, sorted by start_time ascending, deterministic under identical inputs.
+            - A feedback message, which is empty if slots are found or an error message if no slots are available.
     """
 
     if duration <= timedelta(0):
         raise ValueError("duration must be positive")
 
     if n <= 0:
-        return []
+        return [], "No slots requested (n = 0)."  # Feedback for when no slots are requested
 
     STEP = timedelta(minutes=5)
 
@@ -173,7 +168,7 @@ def suggest_slots(
         cand_start = working_start
         cand_end = working_end
 
-    # ensure candidate inside working
+    # Ensure candidate inside working hours
     cand_start = max(cand_start, working_start)
     cand_end = min(cand_end, working_end)
 
@@ -183,7 +178,7 @@ def suggest_slots(
         start = _combine(day, b.start)
         end = _combine(day, b.end)
 
-        # apply buffer
+        # Apply buffer
         start -= buffer
         end += buffer
 
@@ -229,11 +224,19 @@ def suggest_slots(
         t = gap_start
 
         while t + duration <= gap_end:
+            # Ensure the slot is within working hours and long enough to fit the duration
+            if t >= working_end or (gap_end - gap_start) < duration:
+                break  # Don't add invalid slots
+
             slots.append(Slot(start_time=t.time()))
 
             if len(slots) >= n:
-                return sorted(slots, key=lambda s: s.start_time)
+                return sorted(slots, key=lambda s: s.start_time), ""  # Return slots and empty feedback
 
             t += STEP
 
-    return sorted(slots, key=lambda s: s.start_time)
+    # If no slots are found, return an empty list and feedback message
+    if not slots:
+        return [], "No available slots found due to buffer or schedule conflicts."
+
+    return sorted(slots, key=lambda s: s.start_time), ""  # Return sorted slots and empty feedback
