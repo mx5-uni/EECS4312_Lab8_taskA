@@ -1,0 +1,180 @@
+## 1. Problem Understanding - Describe the problem your system solves.
+System purpose: To provide the user with available time slots from their given specifications.
+Inputs to the system: day, working_hours, busy_intervals, duration, n, buffer, candidate_window
+Outputs produced by the system: List[Slot]
+Primary goal of the system: To provide an ordered and non-repeating list of n available time slots from the given specifications.
+
+---
+
+## 2. Assumptions - List assumptions about the environment, users, or
+inputs.
+A1: Users will provide all the information they are asked to
+A2: Users have defined working hours
+A3: Users have a day picked out for their meeting
+A4: The input number 'n', of returned slots, will be non-negative but may be 0
+A5: The input 'buffer' will be non-negative but may be 0
+A6: The environment in which this program will run will not crash or stop while in the middle of computing available time slots.
+
+---
+
+## 3. Functional Requirements - Describe the main behaviors the system
+must perform.
+
+FR1: Accept working hours input.
+FR2: Accept a list of busy intervals.
+FR3: Accept required meeting duration.
+FR4: Accept optional buffer time between meetings.
+FR5: Accept an optional candidate window restriction.
+FR6: Normalize busy intervals if they are unsorted.
+FR7: Merge overlapping busy intervals.
+FR8: Handle adjacent busy intervals correctly.
+FR9: Respect buffer times when computing availability.
+FR10: Ensure suggested slots fall within working hours.
+FR11: Ensure slots do not overlap existing meetings.
+FR12: Ensure slots meet minimum duration requirements.
+FR13: Generate available time gaps between busy intervals.
+FR14: Filter gaps based on duration requirements.
+FR15: Filter gaps based on candidate window restrictions.
+FR16: Return the next N available slots.
+FR17: Return slots in predictable chronological order with consistent ordering when inputs are identical, ensuring deterministic outputs for repeated requests.
+FR18: Produce deterministic results given identical inputs.
+FR19: Handle cases where no slots are available.
+FR20: Correctly handle buffers that eliminate availability.
+FR21: Handle very small gaps between meetings.
+FR22: Avoid duplicate notifications or repeated suggestions for the same time slot.
+FR23: Explicitly handle all edge cases, including zero availability, overlapping meetings, or slots eliminated by buffer times, with user-facing feedback.
+
+---
+
+## 4. System Constraints - Constraints are conditions the system must
+always respect. Each constraint should reference the persona attribute
+it originates from.
+C1: The system must produce deterministic chronological ordering of suggested slots for identical inputs.
+Derived from persona attribute: Jane / Behaviour / User expects predictable ordering
+C2: The system must automatically merge overlapping or adjacent busy intervals and enforce buffer times without manual intervention.
+Derived from persona attribute: Jane / Need / User prefers automatic conflict handling
+C3: The system must avoid generating duplicate availability slots or redundant notifications.
+Derived from persona attribute: Jane / Pain Point / User dislikes notification overload
+C4: The system must provide clear explanations when slots are unavailable due to conflicts, buffer times, or window restrictions.
+Derived from persona attribute: Mo / Need / User requires explicit explanations for system behavior
+C5: The system must produce deterministic results for repeated identical inputs, handling tie conditions consistently.
+Derived from persona attribute: Mo / Behavior / User expects deterministic behavior under ties
+C6: Suggested slots must satisfy minimum duration requirements and honor optional buffer times.
+Derived from persona attribute: Mo / Need / Users need minimum duration and buffer compliance
+C7: The system must filter availability so that all suggested slots lie entirely within working hours.
+Derived from persona attribute: Jane / Need / Users need availability only within working hours
+C8: The system must explicitly handle edge cases (e.g., zero availability, overlapping meetings, buffer-eliminated gaps) and return user-facing notifications.
+Derived from persona attribute: Mo / Pain Point / User expects explicit edge case handling
+
+---
+
+## 5. Acceptance Criteria - Acceptance criteria define how system
+behavior will be verified.
+AC1:
+Given a list of busy intervals and requested meeting duration
+When the system generates available slots
+Then the slots must be returned in chronological order and remain consistent for identical inputs
+Linked Constraint ID(s): C1, C5
+
+AC2:
+Given overlapping or adjacent busy intervals with optional buffer times
+When the system processes the intervals
+Then the system automatically merges intervals and enforces buffer rules without manual intervention
+Linked Constraint ID(s): C2, C6
+
+AC3:
+Given a set of available slots that meet meeting duration requirements
+When the system returns the slots
+Then no duplicate slots or redundant notifications are produced
+Linked Constraint ID(s): C3
+
+AC4:
+Given a requested time outside working hours
+When the system generates available slots
+Then the system excludes any slots that fall outside the defined working hours
+Linked Constraint ID(s): C7
+
+AC5:
+Given a scenario where no slots meet the requested criteria due to conflicts, buffer times, or zero availability
+When the system evaluates availability
+Then the system explicitly notifies the user that no slots are available
+Linked Constraint ID(s): C8, C4
+
+AC6:
+Given multiple identical inputs with potential tie conditions
+When the system calculates availability
+Then the system produces deterministic and repeatable results every time
+Linked Constraint ID(s): C1, C5
+
+---
+
+## 6. Edge Cases - Describe unusual or boundary situations the system
+must handle. 
+
+EC1:
+Description: No available slots meet the requested duration due to full schedule or buffer constraints
+Linked Constraint ID(s): C8, C4
+Covered by Acceptance Criteria ID(s): AC5
+Expected system behavior: It should safely return an emty list.
+
+EC2:
+Description: Busy intervals that are overlapping or adjacent and need merging before computing availability
+Linked Constraint ID(s): C2, C6
+Covered by Acceptance Criteria ID(s): AC2
+Expected system behavior: System will merge those intervals before begining work.
+
+EC3:
+Description: Requested meeting duration is longer than any single gap between busy intervals
+Linked Constraint ID(s): C6
+Covered by Acceptance Criteria ID(s): AC5
+Expected system behavior: The system will return an empty list.
+
+EC4:
+Description: Input contains unsorted busy intervals requiring normalization
+Linked Constraint ID(s): C2
+Covered by Acceptance Criteria ID(s): AC2
+Expected system behavior: The system will normalize that list of busy intervals before cotinuing work.
+
+EC5:
+Description: Multiple slots satisfy availability, including tie conditions (same start time)
+Linked Constraint ID(s): C1, C5
+Covered by Acceptance Criteria ID(s): AC1, AC6
+Expected system behavior: The slots should be returned by earlier end time.
+
+EC6:
+Description: Available slots fall partially outside of working hours and must be filtered
+Linked Constraint ID(s): C7
+Covered by Acceptance Criteria ID(s): AC4
+Expected system behavior: The slots that fall outside the working hours should not be included in the final retutned list.
+
+---
+
+## 7. Traceability - Link functional requirements to constraints and
+acceptance criteria. FR → C → AC mapping
+FR1 → C7 → AC4
+FR2 → C2 → AC2
+FR3 → C6 → AC2, AC5
+FR4 → C2, C6 → AC2
+FR5 → C4, C8 → AC5
+FR6 → C2 → AC2
+FR7 → C2 → AC2
+FR8 → C2 → AC2
+FR9 → C2, C6 → AC2, AC5
+FR10 → C7 → AC4
+FR11 → C2 → AC2
+FR12 → C6 → AC5
+FR13 → C6, C7 → AC4, AC5
+FR14 → C6 → AC5
+FR15 → C4, C8 → AC5
+FR16 → C1, C3 → AC1, AC3, AC6
+FR17 → C1, C5 → AC1, AC6
+FR18 → C5 → AC6
+FR19 → C4, C8 → AC5
+FR20 → C6, C8 → AC5
+FR21 → C6 → AC5
+FR22 → C3 → AC3
+FR23 → C8, C4 → AC5
+
+---
+
+## Revision Notes:
